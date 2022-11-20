@@ -19,7 +19,15 @@ const ProductSchema = new mongoose.Schema({
     type: String
   },
   category: {
-    type: String
+    type: String,
+    enum:["Doormat" ,
+     "Sofa covers" ,
+     "Cushion covers",
+      "Bedsheets" ,
+      "Bed covers" ,
+       "Diwan sets",
+      "Fridge tops",
+      "Table covers"]
   },
   contains: [{
     rawMaterial: {

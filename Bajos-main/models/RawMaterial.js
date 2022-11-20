@@ -17,7 +17,7 @@ const RawMaterialSchema = new mongoose.Schema({
   },
   measurementUnit: {
     type: String,
-    enum: ["KG", "PCS"]
+    enum: ["KG", "PCS", "Meters"]
   },
   price: {
     type: Number
