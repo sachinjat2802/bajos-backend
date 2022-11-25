@@ -310,16 +310,16 @@ async function deleteRawMaterial(req, res, next) {
 
 async function addProduct(req, res, next) {
   try {
-   // await validations.admin.validateAddProduct(req)
+    await validations.admin.validateAddProduct(req)
     //API LOGIC//
-console.log(req.body.name)
+
     req.body.contains=req.body.raw
     req.body.updateRawMaterialsLogs=[]
-    req.body.updateLogs=[{time:new Date(),quantity:req.body.availableQty,note:`added ${req.body?.name}`}]
+    req.body.updateLogs=[{time:new Date(),quantity:req.body.availableQty,note:`added ${req.body.name}`}]
    if(req.body.raw){
     for(const i in req.body.raw){
       const rowMaterial = await new CrudOperations(Model.rawMaterial).getDocument({_id:ObjectId(req.body.raw[i].rm)})
-      req.body.updateRawMaterialsLogs.push({name:`${rowMaterial.name}`,time:new Date(),quantity:req.body.raw[i].qty,note:`initial material added for ${req.body?.name}`})
+      req.body.updateRawMaterialsLogs.push({name:`${rowMaterial.name}`,time:new Date(),quantity:req.body.raw[i].qty,note:`initial material added for ${req.body.name}`})
     }
    }
     let dataToSend = await Model.product.create(req.body);
@@ -450,14 +450,14 @@ async function assignRawMaterialToContractor(req,res,next){
   try{
     const contractor = await new CrudOperations(Model.contractor).getDocument({_id:ObjectId(req.params.id)})
     let flag =true;
-    for(const i in contractor.assignRawMaterial){
+    for(const i in contractor?.assignRawMaterial){
 
-      if(contractor.assignRawMaterial[i].rm === req.body.rawMaterial){
+      if(contractor?.assignRawMaterial[i].rm === req.body.rawMaterial){
         flag= false;
         contractor.assignRawMaterial[i].qty=contractor.assignRawMaterial[i].qty+req.body.quantity;
       }
     }
-    if(contractor.assignRawMaterial.length === 0 ||flag){
+    if(contractor?.assignRawMaterial.length === 0 ||flag){
       contractor.assignRawMaterial.push({rm:req.body.rawMaterial,qty:req.body.quantity})
     }
     const rawMaterial= await new CrudOperations(Model.rawMaterial).getDocument({_id:ObjectId(req.body.rawMaterial)});
@@ -538,6 +538,8 @@ async function createProduction(req, res, next) {
     //API LOGIC//
     let productData = await Model.product.findOne({ _id: ObjectId(req.body.productId) })
       .populate("contains.rawMaterial")
+
+      console.log(productData.contains)
     let contain = productData.contains
     for (let i = 0; i < req.body.rawMaterial.length; i++) {
       let expectedQty;
@@ -545,16 +547,24 @@ async function createProduction(req, res, next) {
       let costPerPcs = 0;
       let rawMaterial = await Model.rawMaterial.findOne({ _id: ObjectId(req.body.rawMaterial[i].materialId) })
       //match product data and add expected quantity
+      
       contain.forEach((e) => {
-        if (req.body.rawMaterial[i].materialId == e.rawMaterial._id) {
-          expectedQty = req.body.rawMaterial[i].quantityAssigned % e.rawQuantity;
+        if (req.body.rawMaterial[i].materialId == e.rm) {
+          expectedQty = req.body.rawMaterial[i].quantityAssigned % Number(e.qty);
           req.body.rawMaterial[i].expectedQuantity = expectedQty
-          expectedProductQty = Math.floor(req.body.rawMaterial[i].quantityAssigned / e.rawQuantity)
-          costPerPcs += req.body.rawMaterial[i].quantityAssigned * req.body.rawMaterial[i].price
+
+          expectedProductQty = Math.floor(req.body.rawMaterial[i].quantityAssigned / Number(e.qty))
+
+          costPerPcs += req.body.rawMaterial[i].quantityAssigned * Number(rawMaterial.price)
+
         }
       })
+      console.log(expectedProductQty)
+
       req.body.expectedProductQty = expectedProductQty
       req.body.costPerPcs = costPerPcs + (req.body.labourCost * expectedProductQty)
+      
+
       //reduce raw material qty from db
       rawMaterial.quantityAvailable = rawMaterial.quantityAvailable - req.body.rawMaterial[i].quantityAssigned
       rawMaterial.save()
@@ -591,10 +601,23 @@ async function listManufacteringProducts(req, res, next) {
 
 async function recieveProduct(req, res, next) {
   try {
-    // await validations.admin.validateRecieveProduct(req)
-    //API LOGIC//
-    req.body.productRecievedOn = new Date();
-    let dataToSend = await Model.manufacturing.findOneAndUpdate({ _id: ObjectId(req.body.id) }, req.body, { new: true })
+    const product = await new CrudOperations(Model.product).getDocument({_id:ObjectId(req.body.productId)})
+    const contractor = await new CrudOperations(Model.contractor).getDocument({_id:ObjectId(req.body.contractorId)})
+    for(const i in product.contains){
+
+      for(const j in contractor.assignRawMaterial){
+        console.log(product.contains[i].rm === contractor.assignRawMaterial[j].rm)
+
+        if(product.contains[i].rm === contractor.assignRawMaterial[j].rm){
+          contractor.assignRawMaterial[j].qty=contractor.assignRawMaterial[j].qty - product.contains[i].qty;
+           await new CrudOperations(Model.contractor).updateDocument({_id:ObjectId(req.body.contractorId)},{assignRawMaterial:contractor.assignRawMaterial[j]})
+        }
+      }
+    }
+if(product.status === "recieved"){
+      return responses.sendFailResponse(req, res, constant.STATUS_CODE.BAD_REQUEST,product,"product already recieved")
+    }
+    let dataToSend = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.params.id)},{status:"recieved"})
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.SUCCESS)
   } catch (error) {
     next(error);

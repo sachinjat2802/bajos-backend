@@ -40,6 +40,11 @@ const ProductSchema = new mongoose.Schema({
   updateLogs:{
     type:[Object]
   },
+  status:{
+    type:String,
+    default:"processing",
+  },
+  
   updateRawMaterialsLogs:{
     type:[Object]
   },

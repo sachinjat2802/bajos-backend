@@ -47,7 +47,7 @@ const validateAddRawMaterial = async (req, property = 'body') => {
     sku: joi.string().allow('').required(),
     quantityAvailable: joi.number().required(),
     measurementUnit: joi.string().required(),
-    price:joi.number().allow('').required(),
+   // price:joi.number().allow('').required(),
   });
   return await validateSchema(req[property], schema);
 
