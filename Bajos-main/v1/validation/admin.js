@@ -46,7 +46,8 @@ const validateAddRawMaterial = async (req, property = 'body') => {
     name: joi.string().allow('').required(),
     sku: joi.string().allow('').required(),
     quantityAvailable: joi.number().required(),
-    measurementUnit: joi.string().valid("KG", "PCS").required(),
+    measurementUnit: joi.string().required(),
+    price:joi.number().allow('').required(),
   });
   return await validateSchema(req[property], schema);
 
@@ -67,7 +68,9 @@ const validateEditRawMaterial = async (req, property = 'body') => {
     name: joi.string().allow('').required(),
     sku: joi.string().allow('').required(),
     quantityAvailable: joi.number().required(),
-    measurementUnit: joi.string().valid("KG", "PCS").required(),
+    measurementUnit: joi.string().required(),
+    price:joi.number().allow(''),
+
   });
   return await validateSchema(req[property], schema);
 
@@ -147,6 +150,7 @@ const validateAddProduct = async (req, property = 'body') => {
     contains: joi.array().optional(),
     availableQty: joi.number().optional(),
     price : joi.number().optional(),
+    raw:joi.array().optional()
   });
   return await validateSchema(req[property], schema);
 

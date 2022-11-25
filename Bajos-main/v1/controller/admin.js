@@ -1,12 +1,13 @@
 const mongoose = require("mongoose");
 const ObjectId = mongoose.Types.ObjectId;
-
+const {CrudOperations}=require("../../utility/moongodbCrud")
 const Model = require("../../models");
 const validations = require('../validation');
 const utility = require("../../utility").commonFunction;
 const messages = require('../../utility/messages').APP_MESSAGES;
 const responses = require('../../utility/response')
 const constant = require('../../utility/constant');
+const { rawMaterial } = require("../../models");
 
 //onboarding
 exports.register = register;
@@ -21,10 +22,13 @@ exports.getAllCategory = getAllCategory;
 exports.deleteCategory = deleteCategory;
 //Raw Material management
 exports.addRawMaterial = addRawMaterial;
+exports.addQuantity=addQuantity;
 exports.getAllRawMaterial = getAllRawMaterial;
 exports.getRawMaterialById = getRawMaterialById;
 exports.editRawMaterial = editRawMaterial;
 exports.deleteRawMaterial = deleteRawMaterial;
+exports.rowMaterialLogByID=rowMaterialLogByID;
+exports.rawMaterialMeasureUnits=rawMaterialMeasureUnits;
 //product management
 exports.addProduct = addProduct;
 exports.getAllProduct = getAllProduct;
@@ -32,6 +36,10 @@ exports.getProductById = getProductById;
 exports.editProduct = editProduct;
 exports.deleteProduct = deleteProduct;
 exports.reduceQuantity = reduceQuantity;
+exports.addProductQuantity=addProductQuantity;
+
+exports.productTypes=productTypes;
+exports.productSize=productSize;
 //contractor management
 exports.addContractor = addContractor;
 exports.getAllContractor = getAllContractor;
@@ -43,6 +51,8 @@ exports.createProduction = createProduction;
 exports.listManufacteringProducts = listManufacteringProducts;
 exports.recieveProduct = recieveProduct;
 exports.detailedReport = detailedReport;
+
+exports.assignRawMaterialToContractor=assignRawMaterialToContractor;
 
 /* HELPER FUNCTION */
 function calculateExpectedProductQty(data) {
@@ -80,6 +90,8 @@ async function register(req, res, next) {
 }
 
 async function login(req, res, next) {
+  console.log(req.body)
+
   try {
     await validations.admin.validateLogin(req)
     //API LOGIC//
@@ -191,13 +203,15 @@ async function addRawMaterial(req, res, next) {
   try {
     await validations.admin.validateAddRawMaterial(req)
     //API LOGIC//
-
+    req.body.updateLogs=[{time:new Date(),quantity:req.body.quantityAvailable,note:"initial material added"}]
     let dataToSend = await Model.rawMaterial.create(req.body);
+    delete dataToSend.updateLogs;
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.ADD_SUCCESS)
   } catch (error) {
     next(error);
   }
 }
+
 
 async function getAllRawMaterial(req, res, next) {
   try {
@@ -209,7 +223,7 @@ async function getAllRawMaterial(req, res, next) {
 
     const count = await Model.rawMaterial.countDocuments({});
     let list = await Model.rawMaterial.find({}).skip(page * limit).sort({ createdAt: -1 })
-
+ 
     dataToSend.list = list || [];
     dataToSend.count = count;
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.SUCCESS)
@@ -229,14 +243,54 @@ async function getRawMaterialById(req, res, next) {
     next(error);
   }
 }
+   async function rawMaterialMeasureUnits(req, res, next)  {
+  try {
+    let dataToSend = await new CrudOperations(Model.unit).getDocument({name:"rawMaterials"})
+    return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend.types, messages.SUCCESS)
+
+  }
+  catch (error) {
+    next(error);
+  }
+}
+
+
+async function rowMaterialLogByID(req, res, next) {
+  try {
+    console.log(req.query.id)
+//await validations.admin.validateGetRawMaterialById(req)
+    //API LOGIC//
+
+    let dataToSend = await Model.rawMaterial.findOne({ _id: ObjectId(req.query.id) })
+    return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend?.updateLogs, messages.SUCCESS)
+  } catch (error) {
+    next(error);
+  }
+}
 
 async function editRawMaterial(req, res, next) {
   try {
     await validations.admin.validateEditRawMaterial(req)
     //API LOGIC//
 
-    let dataToSend = await Model.rawMaterial.findOneAndUpdate({ _id: ObjectId(req.body.id) }, req.body, { new: true });
+    let data = await new CrudOperations(Model.rawMaterial).getDocument({_id: ObjectId(req.body.id)})
+    console.log(data)
+
+    data ={...data,...req.body}
+    console.log(data)
+    let dataToSend = await new CrudOperations(Model.rawMaterial).updateDocument({ _id: ObjectId(req.body.id) },req.body)
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.UPDATE_SUCCESS)
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function addQuantity(req, res, next) {
+  try {
+      let rawMaterial =await new CrudOperations(Model.rawMaterial).getDocument({_id:ObjectId(req.body.id)})
+      rawMaterial.updateLogs.push({time:new Date(),quantity:req.body.quantity,note:req.body.note})
+      let updateRawMaterial = await new CrudOperations(Model.rawMaterial).updateDocument({_id:ObjectId(req.body.id)},{quantityAvailable:rawMaterial.quantityAvailable+req.body.quantity,updateLogs:rawMaterial.updateLogs})
+    return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, updateRawMaterial, messages.UPDATE_SUCCESS)
   } catch (error) {
     next(error);
   }
@@ -246,7 +300,6 @@ async function deleteRawMaterial(req, res, next) {
   try {
     await validations.admin.validateDeleteRawMaterial(req)
     //API LOGIC//
-
     await Model.rawMaterial.findOneAndRemove({ _id: ObjectId(req.query.id) });
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, {}, messages.DELETE_SUCCESS)
   } catch (error) {
@@ -257,12 +310,43 @@ async function deleteRawMaterial(req, res, next) {
 
 async function addProduct(req, res, next) {
   try {
-    await validations.admin.validateAddProduct(req)
+   // await validations.admin.validateAddProduct(req)
     //API LOGIC//
-
+console.log(req.body.name)
+    req.body.contains=req.body.raw
+    req.body.updateRawMaterialsLogs=[]
+    req.body.updateLogs=[{time:new Date(),quantity:req.body.availableQty,note:`added ${req.body?.name}`}]
+   if(req.body.raw){
+    for(const i in req.body.raw){
+      const rowMaterial = await new CrudOperations(Model.rawMaterial).getDocument({_id:ObjectId(req.body.raw[i].rm)})
+      req.body.updateRawMaterialsLogs.push({name:`${rowMaterial.name}`,time:new Date(),quantity:req.body.raw[i].qty,note:`initial material added for ${req.body?.name}`})
+    }
+   }
     let dataToSend = await Model.product.create(req.body);
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.ADD_SUCCESS)
   } catch (error) {
+    next(error);
+  }
+}
+
+async function productTypes(req, res, next)  {
+  try {
+    let dataToSend = await new CrudOperations(Model.unit).getDocument({name:"products"})
+    return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend.types, messages.SUCCESS)
+
+  }
+  catch (error) {
+    next(error);
+  }
+}
+async function productSize(req, res, next)  {
+  try {
+    console.log(req.params)
+    let dataToSend = await new CrudOperations(Model.unit).getDocument({name:req.params.product})
+    return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend.types, messages.SUCCESS)
+
+  }
+  catch (error) {
     next(error);
   }
 }
@@ -325,6 +409,17 @@ async function deleteProduct(req, res, next) {
   }
 }
 
+async function addProductQuantity(req, res, next) {
+  try {
+      let product =await new CrudOperations(Model.product).getDocument({_id:ObjectId(req.body.id)})
+      product.updateLogs.push({time:new Date(),quantity:req.body.quantity,note:req.body.note})
+      let updateProduct = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.body.id)},{availableQty:product.availableQty+req.body.quantity,updateLogs: product.updateLogs})
+    return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, updateProduct, messages.UPDATE_SUCCESS)
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function reduceQuantity(req, res, next) {
   try {
     await validations.admin.validateReduceQuantity(req)
@@ -349,6 +444,35 @@ async function addContractor(req, res, next) {
   } catch (error) {
     next(error);
   }
+}
+
+async function assignRawMaterialToContractor(req,res,next){
+  try{
+    const contractor = await new CrudOperations(Model.contractor).getDocument({_id:ObjectId(req.params.id)})
+    let flag =true;
+    for(const i in contractor.assignRawMaterial){
+
+      if(contractor.assignRawMaterial[i].rm === req.body.rawMaterial){
+        flag= false;
+        contractor.assignRawMaterial[i].qty=contractor.assignRawMaterial[i].qty+req.body.quantity;
+      }
+    }
+    if(contractor.assignRawMaterial.length === 0 ||flag){
+      contractor.assignRawMaterial.push({rm:req.body.rawMaterial,qty:req.body.quantity})
+    }
+    const rawMaterial= await new CrudOperations(Model.rawMaterial).getDocument({_id:ObjectId(req.body.rawMaterial)});
+    rawMaterial.contractorUseLogs.push({time:new Date(),contractor:`${contractor.name}`,qty:req.body,note:req.body.note});
+    if(rawMaterial.quantityAvailable<req.body.quantity){
+      return responses.sendFailResponse(req, res, constant.STATUS_CODE.BAD_REQUEST,  `${rawMaterial.name} is not available in stock`)
+    }
+    await new CrudOperations(Model.rawMaterial).updateDocument({_id:ObjectId(req.body.rawMaterial)},{contractorUseLogs:rawMaterial.contractorUseLogs,quantityAvailable:rawMaterial.quantityAvailable-req.body.quantity})
+    
+    let updateContractor = await new CrudOperations(Model.contractor).updateDocument({_id:ObjectId(req.params.id)},{assignRawMaterial:contractor.assignRawMaterial});
+    return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, updateContractor, messages.UPDATE_SUCCESS)
+}catch (error) {
+    next(error);
+  }
+  
 }
 
 async function getAllContractor(req, res, next) {

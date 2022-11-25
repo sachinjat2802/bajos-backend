@@ -14,6 +14,9 @@ const ContractorSchema = new mongoose.Schema({
   note: {
     type: String,
   },
+  assignRawMaterial:{
+    type:[Object]
+  }
 
 }, {
   timestamps: true,

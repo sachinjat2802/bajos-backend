@@ -17,11 +17,17 @@ const RawMaterialSchema = new mongoose.Schema({
   },
   measurementUnit: {
     type: String,
-    enum: ["KG", "PCS", "Meters"]
+//enum: ["KG", "Pcs","Inch","Meters","Centimeters","Grams"]
   },
   price: {
     type: Number
-  }
+  },
+  updateLogs:{
+    type:[Object]
+  },
+  contractorUseLogs:{
+    type:[Object]
+  },
 }, {
   timestamps: true,
   toObject: { virtuals: true },

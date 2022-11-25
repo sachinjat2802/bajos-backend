@@ -33,6 +33,11 @@ router.get('/getRawMaterialById', adminControllers.getRawMaterialById)
 router.put('/editRawMaterial', adminControllers.editRawMaterial)
 router.delete('/deleteRawMaterial', adminControllers.deleteRawMaterial)
 
+router.put('/addQuantity', adminControllers.addQuantity)
+router.get("/rowMaterialLogByID",adminControllers.rowMaterialLogByID)
+
+router.get("/rawMaterialMeasureUnits",adminControllers.rawMaterialMeasureUnits)
+
 /*
   Product MANAGEMENT
 */
@@ -43,6 +48,11 @@ router.put('/editProduct', adminControllers.editProduct)
 router.delete('/deleteProduct', adminControllers.deleteProduct)
 router.put('/reduceQuantity', adminControllers.reduceQuantity)
 
+router.put('/addProductQuantity', adminControllers.addProductQuantity)
+router.get("/productTypes",adminControllers.productTypes)
+router.get("/productSize/:product",adminControllers.productSize)
+
+
 /*
   CONTRACTOR MANAGEMENT
 */
@@ -51,6 +61,8 @@ router.get('/getAllContractor', adminControllers.getAllContractor)
 router.get('/getContractorById', adminControllers.getContractorById)
 router.put('/editContractor', adminControllers.editContractor)
 router.delete('/deleteContractor', adminControllers.deleteContractor)
+
+router.put('/assignRawMaterialToContractor/:id', adminControllers.assignRawMaterialToContractor)
 
 /*
   MANUFACTURING MANAGEMENT

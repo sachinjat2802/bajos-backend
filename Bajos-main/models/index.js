@@ -5,4 +5,5 @@ module.exports = {
   rawMaterial: require('./RawMaterial'),
   manufacturing: require('./Manufacturing'),
   category: require('./Category'),
+  unit : require('./units'),
 }
