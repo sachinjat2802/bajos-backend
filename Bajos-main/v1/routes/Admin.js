@@ -61,13 +61,14 @@ router.get('/getAllContractor', adminControllers.getAllContractor)
 router.get('/getContractorById', adminControllers.getContractorById)
 router.put('/editContractor', adminControllers.editContractor)
 router.delete('/deleteContractor', adminControllers.deleteContractor)
+
 router.put('/assignRawMaterialToContractor/:id', adminControllers.assignRawMaterialToContractor)
 
 /*
   MANUFACTURING MANAGEMENT
 */
 router.post('/createProduction', adminControllers.createProduction)
-router.post('/recieveProduct', adminControllers.recieveProduct)
+router.post('/recieveProduct/:id', adminControllers.recieveProduct)
 router.get('/listManufacteringProducts', adminControllers.listManufacteringProducts)
 router.get('/detailedReport', adminControllers.detailedReport)
 

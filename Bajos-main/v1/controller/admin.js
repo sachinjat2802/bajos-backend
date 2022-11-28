@@ -226,9 +226,6 @@ async function getAllRawMaterial(req, res, next) {
  
     dataToSend.list = list || [];
     dataToSend.count = count;
-
-    console.log(dataToSend)
-
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.SUCCESS)
   } catch (error) {
     next(error);
@@ -291,7 +288,7 @@ async function editRawMaterial(req, res, next) {
 async function addQuantity(req, res, next) {
   try {
       let rawMaterial =await new CrudOperations(Model.rawMaterial).getDocument({_id:ObjectId(req.body.id)})
-      rawMaterial.updateLogs.push({time:new Date(),quantity:Number(req.body.quantity),note:req.body.note})
+      rawMaterial.updateLogs.push({time:new Date(),quantity:req.body.quantity,note:req.body.note})
       let updateRawMaterial = await new CrudOperations(Model.rawMaterial).updateDocument({_id:ObjectId(req.body.id)},{quantityAvailable:Number(rawMaterial.quantityAvailable)+Number(req.body.quantity),updateLogs:rawMaterial.updateLogs})
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, updateRawMaterial, messages.UPDATE_SUCCESS)
   } catch (error) {
@@ -366,17 +363,8 @@ async function getAllProduct(req, res, next) {
     let list = await Model.product.find({}).skip(page * limit).sort({ createdAt: -1 })
       .populate("contains.rawMaterial")
 
-      for(const i in list){
-        for(const j in list[i].contains){
-          const rawMaterial = await new CrudOperations(Model.rawMaterial).getDocument({_id:ObjectId(list[i].contains[j].rm)})
-          console.log(rawMaterial.name)
-           list[i].contains[j].rm=rawMaterial.name
-        }
-      }
     dataToSend.list = list || [];
     dataToSend.count = count;
-
-   
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.SUCCESS)
   } catch (error) {
     next(error);
@@ -425,7 +413,7 @@ async function addProductQuantity(req, res, next) {
   try {
       let product =await new CrudOperations(Model.product).getDocument({_id:ObjectId(req.body.id)})
       product.updateLogs.push({time:new Date(),quantity:req.body.quantity,note:req.body.note})
-      let updateProduct = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.body.id)},{availableQty:Number(product.availableQty)+Number(req.body.quantity),updateLogs: product.updateLogs})
+      let updateProduct = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.body.id)},{availableQty:product.availableQty+req.body.quantity,updateLogs: product.updateLogs})
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, updateProduct, messages.UPDATE_SUCCESS)
   } catch (error) {
     next(error);
