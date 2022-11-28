@@ -362,7 +362,12 @@ async function getAllProduct(req, res, next) {
     const count = await Model.product.countDocuments({});
     let list = await Model.product.find({}).skip(page * limit).sort({ createdAt: -1 })
       .populate("contains.rawMaterial")
-
+      for(const i in list){
+        for(const j in list[i].contains){
+          const rawMaterial = await new CrudOperations(Model.rawMaterial).getDocument({_id:list[i].contains[j].rm})
+          list[i].contains[j].rm = rawMaterial.name
+        }
+      }
     dataToSend.list = list || [];
     dataToSend.count = count;
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.SUCCESS)
@@ -412,8 +417,8 @@ async function deleteProduct(req, res, next) {
 async function addProductQuantity(req, res, next) {
   try {
       let product =await new CrudOperations(Model.product).getDocument({_id:ObjectId(req.body.id)})
-      product.updateLogs.push({time:new Date(),quantity:req.body.quantity,note:req.body.note})
-      let updateProduct = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.body.id)},{availableQty:product.availableQty+req.body.quantity,updateLogs: product.updateLogs})
+      product.updateLogs.push({time:new Date(),quantity:Number(req.body.quantity),note:req.body.note})
+      let updateProduct = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.body.id)},{availableQty:Number(product.availableQty)+Number(req.body.quantity),updateLogs: product.updateLogs})
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, updateProduct, messages.UPDATE_SUCCESS)
   } catch (error) {
     next(error);
@@ -465,7 +470,7 @@ async function assignRawMaterialToContractor(req,res,next){
     if(rawMaterial.quantityAvailable<req.body.quantity){
       return responses.sendFailResponse(req, res, constant.STATUS_CODE.BAD_REQUEST,  `${rawMaterial.name} is not available in stock`)
     }
-    await new CrudOperations(Model.rawMaterial).updateDocument({_id:ObjectId(req.body.rawMaterial)},{contractorUseLogs:rawMaterial.contractorUseLogs,quantityAvailable:rawMaterial.quantityAvailable-req.body.quantity})
+    await new CrudOperations(Model.rawMaterial).updateDocument({_id:ObjectId(req.body.rawMaterial)},{contractorUseLogs:rawMaterial.contractorUseLogs,quantityAvailable:Number(rawMaterial.quantityAvailable)-Number(req.body.quantity)})
     
     let updateContractor = await new CrudOperations(Model.contractor).updateDocument({_id:ObjectId(req.params.id)},{assignRawMaterial:contractor.assignRawMaterial});
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, updateContractor, messages.UPDATE_SUCCESS)
@@ -609,7 +614,7 @@ async function recieveProduct(req, res, next) {
         console.log(product.contains[i].rm === contractor.assignRawMaterial[j].rm)
 
         if(product.contains[i].rm === contractor.assignRawMaterial[j].rm){
-          contractor.assignRawMaterial[j].qty=contractor.assignRawMaterial[j].qty - product.contains[i].qty;
+          contractor.assignRawMaterial[j].qty=Number(contractor.assignRawMaterial[j].qty) - Number(product.contains[i].qty);
            await new CrudOperations(Model.contractor).updateDocument({_id:ObjectId(req.body.contractorId)},{assignRawMaterial:contractor.assignRawMaterial[j]})
         }
       }
