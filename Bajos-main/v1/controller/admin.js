@@ -288,7 +288,7 @@ async function editRawMaterial(req, res, next) {
 async function addQuantity(req, res, next) {
   try {
       let rawMaterial =await new CrudOperations(Model.rawMaterial).getDocument({_id:ObjectId(req.body.id)})
-      rawMaterial.updateLogs.push({time:new Date(),quantity:req.body.quantity,note:req.body.note})
+      rawMaterial.updateLogs.push({time:new Date(),quantity:Number(req.body.quantity),note:req.body.note})
       let updateRawMaterial = await new CrudOperations(Model.rawMaterial).updateDocument({_id:ObjectId(req.body.id)},{quantityAvailable:rawMaterial.quantityAvailable+req.body.quantity,updateLogs:rawMaterial.updateLogs})
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, updateRawMaterial, messages.UPDATE_SUCCESS)
   } catch (error) {
