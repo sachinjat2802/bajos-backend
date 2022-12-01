@@ -454,25 +454,27 @@ async function addContractor(req, res, next) {
 async function assignRawMaterialToContractor(req,res,next){
   try{
     const contractor = await new CrudOperations(Model.contractor).getDocument({_id:ObjectId(req.params.id)})
+    console.log(contractor)
     let flag =true;
     for(const i in contractor?.assignRawMaterial){
 
       if(contractor?.assignRawMaterial[i].rm === req.body.rawMaterial){
         flag= false;
-        contractor.assignRawMaterial[i].qty=contractor.assignRawMaterial[i].qty+req.body.quantity;
+        contractor.assignRawMaterial[i].qty=Number(contractor.assignRawMaterial[i].qty)+Number(req.body.quantity);
+        contractor.assignRawMaterial[i].pricePerUnit=Number(req.body.pricePerUnit)??contractor.assignRawMaterial[i].pricePerUnit;
       }
     }
-    if(contractor?.assignRawMaterial.length === 0 ||flag){
-      contractor.assignRawMaterial.push({rm:req.body.rawMaterial,qty:req.body.quantity})
+    if(contractor?.assignRawMaterial.length === 0 || flag){
+      contractor?.assignRawMaterial.push({rm:req.body.rawMaterial,qty:req.body.quantity,pricePerUnit:req.body.pricePerUnit})
     }
     const rawMaterial= await new CrudOperations(Model.rawMaterial).getDocument({_id:ObjectId(req.body.rawMaterial)});
-    rawMaterial.contractorUseLogs.push({time:new Date(),contractor:`${contractor.name}`,qty:req.body,note:req.body.note});
+    rawMaterial?.contractorUseLogs.push({time:new Date(),contractor:`${contractor?.name}`,qty:req.body,note:req.body.note});
     if(rawMaterial.quantityAvailable<req.body.quantity){
-      return responses.sendFailResponse(req, res, constant.STATUS_CODE.BAD_REQUEST,  `${rawMaterial.name} is not available in stock`)
+      return responses.sendFailResponse(req, res, constant.STATUS_CODE.BAD_REQUEST,  `row material is not available in stock`)
     }
     await new CrudOperations(Model.rawMaterial).updateDocument({_id:ObjectId(req.body.rawMaterial)},{contractorUseLogs:rawMaterial.contractorUseLogs,quantityAvailable:Number(rawMaterial.quantityAvailable)-Number(req.body.quantity)})
     
-    let updateContractor = await new CrudOperations(Model.contractor).updateDocument({_id:ObjectId(req.params.id)},{assignRawMaterial:contractor.assignRawMaterial});
+    let updateContractor = await new CrudOperations(Model.contractor).updateDocument({_id:ObjectId(req.params.id)},{assignRawMaterial:contractor?.assignRawMaterial});
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, updateContractor, messages.UPDATE_SUCCESS)
 }catch (error) {
     next(error);
@@ -606,23 +608,29 @@ async function listManufacteringProducts(req, res, next) {
 
 async function recieveProduct(req, res, next) {
   try {
-    const product = await new CrudOperations(Model.product).getDocument({_id:ObjectId(req.body.productId)})
+    const product = await new CrudOperations(Model.product).getDocument({_id:ObjectId(req.params.id)})
     const contractor = await new CrudOperations(Model.contractor).getDocument({_id:ObjectId(req.body.contractorId)})
+    let price =0;
+    for(const j in contractor.assignRawMaterial){
+
     for(const i in product.contains){
 
-      for(const j in contractor.assignRawMaterial){
-        console.log(product.contains[i].rm === contractor.assignRawMaterial[j].rm)
 
         if(product.contains[i].rm === contractor.assignRawMaterial[j].rm){
+
           contractor.assignRawMaterial[j].qty=Number(contractor.assignRawMaterial[j].qty) - Number(product.contains[i].qty);
+
+         price = price+ (Number(product.contains[i].qty)*Number(contractor.assignRawMaterial[j].pricePerUnit))
+         console.log(price)
+
            await new CrudOperations(Model.contractor).updateDocument({_id:ObjectId(req.body.contractorId)},{assignRawMaterial:contractor.assignRawMaterial[j]})
         }
       }
-    }
-if(product.status === "recieved"){
-      return responses.sendFailResponse(req, res, constant.STATUS_CODE.BAD_REQUEST,product,"product already recieved")
-    }
+    }  
+
     let dataToSend = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.params.id)},{status:"recieved"})
+ 
+    dataToSend.price = price + (Number(req.body.labourCost??0))
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.SUCCESS)
   } catch (error) {
     next(error);
