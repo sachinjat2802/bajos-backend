@@ -35,6 +35,9 @@ router.delete('/deleteRawMaterial', adminControllers.deleteRawMaterial)
 
 router.put('/addQuantity', adminControllers.addQuantity)
 router.get("/rowMaterialLogByID",adminControllers.rowMaterialLogByID)
+router.get('/getRawMaterialContracterById', adminControllers.getRawMaterialContracterById)
+router.get('/getRawMaterialAssignedToAllContracters',adminControllers.getRawMaterialAssignedToAllContracters)
+router.get('/getAllProductsRecieved',adminControllers.getAllProductsRecieved)
 
 router.get("/rawMaterialMeasureUnits",adminControllers.rawMaterialMeasureUnits)
 
