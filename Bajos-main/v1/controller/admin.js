@@ -29,6 +29,9 @@ exports.editRawMaterial = editRawMaterial;
 exports.deleteRawMaterial = deleteRawMaterial;
 exports.rowMaterialLogByID=rowMaterialLogByID;
 exports.rawMaterialMeasureUnits=rawMaterialMeasureUnits;
+exports.getRawMaterialContracterById=getRawMaterialContracterById;
+exports.getRawMaterialAssignedToAllContracters=getRawMaterialAssignedToAllContracters;
+exports.getAllProductsRecieved=getAllProductsRecieved;
 //product management
 exports.addProduct = addProduct;
 exports.getAllProduct = getAllProduct;
@@ -255,6 +258,22 @@ async function getRawMaterialById(req, res, next) {
 }
 
 
+async function getRawMaterialContracterById(req, res, next) {
+  try {
+    console.log(req.query.id)
+//await validations.admin.validateGetRawMaterialById(req)
+    //API LOGIC//
+
+    let dataToSend = await Model.rawMaterial.findOne({ _id: ObjectId(req.query.id) })
+    for(let i in dataToSend.contractorUseLogs){
+      dataToSend.contractorUseLogs[i].time = dataToSend.contractorUseLogs[i].time.toLocaleDateString();
+    }
+    return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend?.contractorUseLogs, messages.SUCCESS)
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function rowMaterialLogByID(req, res, next) {
   try {
     console.log(req.query.id)
@@ -262,6 +281,9 @@ async function rowMaterialLogByID(req, res, next) {
     //API LOGIC//
 
     let dataToSend = await Model.rawMaterial.findOne({ _id: ObjectId(req.query.id) })
+    for(let i in dataToSend.updateLogs){
+      dataToSend.updateLogs[i].time = dataToSend.updateLogs[i].time.toLocaleDateString();
+    }
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend?.updateLogs, messages.SUCCESS)
   } catch (error) {
     next(error);
@@ -362,7 +384,12 @@ async function getAllProduct(req, res, next) {
     const count = await Model.product.countDocuments({});
     let list = await Model.product.find({}).skip(page * limit).sort({ createdAt: -1 })
       .populate("contains.rawMaterial")
-
+      for(const i in list){
+        for(const j in list[i].contains){
+          const rawMaterial = await new CrudOperations(Model.rawMaterial).getDocument({_id:list[i].contains[j].rm})
+          list[i].contains[j].rm = rawMaterial.name
+        }
+      }
     dataToSend.list = list || [];
     dataToSend.count = count;
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.SUCCESS)
@@ -412,8 +439,8 @@ async function deleteProduct(req, res, next) {
 async function addProductQuantity(req, res, next) {
   try {
       let product =await new CrudOperations(Model.product).getDocument({_id:ObjectId(req.body.id)})
-      product.updateLogs.push({time:new Date(),quantity:req.body.quantity,note:req.body.note})
-      let updateProduct = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.body.id)},{availableQty:product.availableQty+req.body.quantity,updateLogs: product.updateLogs})
+      product.updateLogs.push({time:new Date(),quantity:Number(req.body.quantity),note:req.body.note})
+      let updateProduct = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.body.id)},{availableQty:Number(product.availableQty)+Number(req.body.quantity),updateLogs: product.updateLogs})
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, updateProduct, messages.UPDATE_SUCCESS)
   } catch (error) {
     next(error);
@@ -445,6 +472,32 @@ async function addContractor(req, res, next) {
     next(error);
   }
 }
+async function getRawMaterialAssignedToAllContracters(req,res,next){
+try{
+  const contractors = await new CrudOperations(Model.contractor).getAllDocuments({},{},{pageNo:0,limit:0})
+ const dataTosend =[];
+  for(let i in contractors){
+    for(let j in contractors[i].assignRawMaterial){
+      let rawMaterial = await new CrudOperations(Model.rawMaterial).getDocument({_id:ObjectId(contractors[i].assignRawMaterial[j].rm)})
+     
+      dataTosend.push({
+        contractor:contractors[i].name,
+        rawMaterial:rawMaterial.name,
+        quantity:contractors[i].assignRawMaterial[j].qty,
+        pricePerUnit:contractors[i].assignRawMaterial[j].pricePerUnit,
+        date:contractors[i].assignRawMaterial[j].date.toLocaleDateString(),
+        note:contractors[i].assignRawMaterial[j].note
+      })
+    }
+    
+  }
+  return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataTosend, messages.UPDATE_SUCCESS)
+
+
+}catch (error) {
+    next(error);
+  }
+}
 
 async function assignRawMaterialToContractor(req,res,next){
   try{
@@ -454,20 +507,22 @@ async function assignRawMaterialToContractor(req,res,next){
 
       if(contractor?.assignRawMaterial[i].rm === req.body.rawMaterial){
         flag= false;
-        contractor.assignRawMaterial[i].qty=contractor.assignRawMaterial[i].qty+req.body.quantity;
+        contractor.assignRawMaterial[i].qty=Number(contractor.assignRawMaterial[i].qty)+Number(req.body.quantity);
+        contractor.assignRawMaterial[i].pricePerUnit=Number(req.body.pricePerUnit)??contractor.assignRawMaterial[i].pricePerUnit;
       }
     }
-    if(contractor?.assignRawMaterial.length === 0 ||flag){
-      contractor.assignRawMaterial.push({rm:req.body.rawMaterial,qty:req.body.quantity})
+    if(contractor?.assignRawMaterial.length === 0 || flag){
+     
+      contractor?.assignRawMaterial.push({rm:req.body.rawMaterial,qty:Number(req.body.quantity),pricePerUnit:req.body.pricePerUnit,date:new Date()})
     }
     const rawMaterial= await new CrudOperations(Model.rawMaterial).getDocument({_id:ObjectId(req.body.rawMaterial)});
-    rawMaterial.contractorUseLogs.push({time:new Date(),contractor:`${contractor.name}`,qty:req.body,note:req.body.note});
+    rawMaterial?.contractorUseLogs.push({time:new Date(),contractor:`${contractor?.name}`,qty:Number(req.body.quantity),note:req.body.note,pricePerUnit:Number(req.body.pricePerUnit)});
     if(rawMaterial.quantityAvailable<req.body.quantity){
-      return responses.sendFailResponse(req, res, constant.STATUS_CODE.BAD_REQUEST,  `${rawMaterial.name} is not available in stock`)
+      return responses.sendFailResponse(req, res, constant.STATUS_CODE.BAD_REQUEST,  `row material is not available in stock`)
     }
-    await new CrudOperations(Model.rawMaterial).updateDocument({_id:ObjectId(req.body.rawMaterial)},{contractorUseLogs:rawMaterial.contractorUseLogs,quantityAvailable:rawMaterial.quantityAvailable-req.body.quantity})
+    await new CrudOperations(Model.rawMaterial).updateDocument({_id:ObjectId(req.body.rawMaterial)},{contractorUseLogs:rawMaterial.contractorUseLogs,quantityAvailable:Number(rawMaterial.quantityAvailable)-Number(req.body.quantity),pricePerUnit:Number(req.body.pricePerUnit)})
     
-    let updateContractor = await new CrudOperations(Model.contractor).updateDocument({_id:ObjectId(req.params.id)},{assignRawMaterial:contractor.assignRawMaterial});
+    let updateContractor = await new CrudOperations(Model.contractor).updateDocument({_id:ObjectId(req.params.id)},{assignRawMaterial:contractor?.assignRawMaterial});
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, updateContractor, messages.UPDATE_SUCCESS)
 }catch (error) {
     next(error);
@@ -601,27 +656,52 @@ async function listManufacteringProducts(req, res, next) {
 
 async function recieveProduct(req, res, next) {
   try {
-    const product = await new CrudOperations(Model.product).getDocument({_id:ObjectId(req.body.productId)})
+    const product = await new CrudOperations(Model.product).getDocument({_id:ObjectId(req.params.id)})
     const contractor = await new CrudOperations(Model.contractor).getDocument({_id:ObjectId(req.body.contractorId)})
+    let price =0;
+    for(const j in contractor.assignRawMaterial){
+
     for(const i in product.contains){
 
-      for(const j in contractor.assignRawMaterial){
-        console.log(product.contains[i].rm === contractor.assignRawMaterial[j].rm)
 
         if(product.contains[i].rm === contractor.assignRawMaterial[j].rm){
-          contractor.assignRawMaterial[j].qty=contractor.assignRawMaterial[j].qty - product.contains[i].qty;
+
+          contractor.assignRawMaterial[j].qty=Number(contractor.assignRawMaterial[j].qty) - Number(product.contains[i].qty);
+
+         price = price+ (Number(product.contains[i].qty)*Number(contractor.assignRawMaterial[j].pricePerUnit))
+         console.log(price)
+
            await new CrudOperations(Model.contractor).updateDocument({_id:ObjectId(req.body.contractorId)},{assignRawMaterial:contractor.assignRawMaterial[j]})
         }
       }
-    }
-if(product.status === "recieved"){
-      return responses.sendFailResponse(req, res, constant.STATUS_CODE.BAD_REQUEST,product,"product already recieved")
-    }
-    let dataToSend = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.params.id)},{status:"recieved"})
+    }  
+
+    let dataToSend = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.params.id)},{status:"recieved", price: price +(Number(req.body.labourCost??0))})
+    dataToSend.price =  price +(Number(req.body.labourCost??0))
+
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.SUCCESS)
   } catch (error) {
     next(error);
   }
+}
+async function getAllProductsRecieved(req,res,next){
+try{
+  const dataToSend = []
+  const data = await new CrudOperations(Model.product).getAllDocuments({status:"recieved"},{},{pageNo:0,limit:0})
+  for(const i in data){
+   dataToSend.push({
+    productName: data[i].name,
+    date: data[i].updatedAt.toLocaleDateString(),
+    quentity:data[i].availableQty,
+    sku:data[i].sku,
+    price:data[i].price
+})
+  }
+  return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.SUCCESS)
+}
+catch (error) {           
+next(error)
+}
 }
 
 async function detailedReport(req, res, next) {
