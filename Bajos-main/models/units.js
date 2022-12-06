@@ -5,7 +5,7 @@ const UnitSchema = new mongoose.Schema({
     type: String
   },
   types:{
-    type:[String]
+    type:[]
   }
   
 }, {

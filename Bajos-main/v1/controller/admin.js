@@ -658,6 +658,7 @@ async function recieveProduct(req, res, next) {
   try {
     const product = await new CrudOperations(Model.product).getDocument({_id:ObjectId(req.params.id)})
     const contractor = await new CrudOperations(Model.contractor).getDocument({_id:ObjectId(req.body.contractorId)})
+
     let price =0;
     for(const j in contractor.assignRawMaterial){
 
@@ -676,8 +677,14 @@ async function recieveProduct(req, res, next) {
       }
     }  
 
-    let dataToSend = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.params.id)},{status:"recieved", price: price +(Number(req.body.labourCost??0))})
-    dataToSend.price =  price +(Number(req.body.labourCost??0))
+
+    let dataToSend = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.params.id)},{status:"recieved",})
+    dataToSend.price =  (price +(Number(req.body.labourCost??0)))*req.body.quantity
+    dataToSend.availableQty=req.body.quantity
+
+let recievedLogs =await new CrudOperations(Model.unit).getDocument({name:"productsLog"})
+recievedLogs.types.push(dataToSend)
+ await new CrudOperations(Model.unit).updateDocument({name:"productsLog"},{types:recievedLogs.types})
 
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.SUCCESS)
   } catch (error) {
@@ -687,7 +694,9 @@ async function recieveProduct(req, res, next) {
 async function getAllProductsRecieved(req,res,next){
 try{
   const dataToSend = []
-  const data = await new CrudOperations(Model.product).getAllDocuments({status:"recieved"},{},{pageNo:0,limit:0})
+  
+  let data =await new CrudOperations(Model.unit).getDocument({name:"productsLog"})
+  data=data.types
   for(const i in data){
    dataToSend.push({
     productName: data[i].name,
