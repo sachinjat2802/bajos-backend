@@ -56,6 +56,7 @@ exports.recieveProduct = recieveProduct;
 exports.detailedReport = detailedReport;
 
 exports.assignRawMaterialToContractor=assignRawMaterialToContractor;
+exports.getAllrawMaterialUsedByContracter=getAllrawMaterialUsedByContracter;
 
 /* HELPER FUNCTION */
 function calculateExpectedProductQty(data) {
@@ -474,20 +475,28 @@ async function addContractor(req, res, next) {
 }
 async function getRawMaterialAssignedToAllContracters(req,res,next){
 try{
-  const contractors = await new CrudOperations(Model.contractor).getAllDocuments({},{},{pageNo:0,limit:0})
+  let contractors;
+  if(req.params.id){
+     contractors = await new CrudOperations(Model.contractor).getAllDocuments({_id:mongoose.Types.ObjectId(req.params.id)},{},{pageNo:0,limit:0})
+
+  }else{
+    contractors = await new CrudOperations(Model.contractor).getAllDocuments({},{},{pageNo:0,limit:0})
+
+  }
  const dataTosend =[];
   for(let i in contractors){
     for(let j in contractors[i].assignRawMaterial){
       let rawMaterial = await new CrudOperations(Model.rawMaterial).getDocument({_id:ObjectId(contractors[i].assignRawMaterial[j].rm)})
-     
+     if(contractors[i]?.name &&  rawMaterial?.name){
       dataTosend.push({
-        contractor:contractors[i].name,
-        rawMaterial:rawMaterial.name,
+        contractor:contractors[i]?.name,
+        rawMaterial:rawMaterial?.name,
         quantity:contractors[i].assignRawMaterial[j].qty,
         pricePerUnit:contractors[i].assignRawMaterial[j].pricePerUnit,
         date:contractors[i].assignRawMaterial[j].date.toLocaleDateString(),
         note:contractors[i].assignRawMaterial[j].note
       })
+    }
     }
     
   }
@@ -658,7 +667,6 @@ async function recieveProduct(req, res, next) {
   try {
     const product = await new CrudOperations(Model.product).getDocument({_id:ObjectId(req.params.id)})
     const contractor = await new CrudOperations(Model.contractor).getDocument({_id:ObjectId(req.body.contractorId)})
-
     let price =0;
     for(const j in contractor.assignRawMaterial){
 
@@ -677,27 +685,49 @@ async function recieveProduct(req, res, next) {
       }
     }  
 
-
-    let dataToSend = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.params.id)},{status:"recieved",})
-    dataToSend.price =  (price +(Number(req.body.labourCost??0)))*req.body.quantity
-    dataToSend.availableQty=req.body.quantity
-
-let recievedLogs =await new CrudOperations(Model.unit).getDocument({name:"productsLog"})
-recievedLogs.types.push(dataToSend)
- await new CrudOperations(Model.unit).updateDocument({name:"productsLog"},{types:recievedLogs.types})
+    let dataToSend = await new CrudOperations(Model.product).updateDocument({_id:ObjectId(req.params.id)},{status:"recieved",contractor:req.body.contractorId, price: price +(Number(req.body.labourCost??0))})
+    dataToSend.price =  price +(Number(req.body.labourCost??0))
 
     return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.SUCCESS)
   } catch (error) {
     next(error);
   }
 }
+
+async function getAllrawMaterialUsedByContracter(req,res,next){
+  try{
+    const dataToSend = []
+    let data;
+    if(req.params.id){
+       data = await new CrudOperations(Model.product).getAllDocuments({status:"recieved"},{},{pageNo:0,limit:0})
+    }
+    else{
+     data = await new CrudOperations(Model.product).getAllDocuments({status:"recieved",contractor:req.params.id},{},{pageNo:0,limit:0})
+  
+    }
+    for(const i in data){
+  
+     dataToSend.push(...data[i].updateRawMaterialsLogs)
+    }
+    return responses.sendSuccessResponse(req, res, constant.STATUS_CODE.OK, dataToSend, messages.SUCCESS)
+  }
+  catch (error) {           
+  next(error)
+  }
+  }
 async function getAllProductsRecieved(req,res,next){
 try{
   const dataToSend = []
-  
-  let data =await new CrudOperations(Model.unit).getDocument({name:"productsLog"})
-  data=data.types
+  let data;
+  if(req.params.id){
+     data = await new CrudOperations(Model.product).getAllDocuments({status:"recieved"},{},{pageNo:0,limit:0})
+  }
+  else{
+   data = await new CrudOperations(Model.product).getAllDocuments({status:"recieved",contractor:req.params.id},{},{pageNo:0,limit:0})
+
+  }
   for(const i in data){
+
    dataToSend.push({
     productName: data[i].name,
     date: data[i].updatedAt.toLocaleDateString(),
@@ -712,6 +742,7 @@ catch (error) {
 next(error)
 }
 }
+
 
 async function detailedReport(req, res, next) {
   try {
